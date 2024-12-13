@@ -43,5 +43,5 @@ class FileService
 		{
 			fileInputStream.close()
 		}
-	}.flowOn(Dispatchers.IO)
+	}
 }

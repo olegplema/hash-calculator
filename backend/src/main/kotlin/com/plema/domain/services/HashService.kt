@@ -27,33 +27,29 @@ class HashService
 			for (file in files)
 			{
 				launch {
-
 					fileService.readFile(file, uuid).collect { calculateHashes(it) }
 				}
-
 			}
 		}
 
 		return uuid
 	}
 
-	private suspend fun calculateHashes(readResult: ReadResult) = withContext(Dispatchers.Default) {
+	private fun calculateHashes(readResult: ReadResult) {
 		val process = hashProcesses[readResult.processId]
 		val algorithms = process?.algorithms
 		val currentFile = process?.files[readResult.filePath]
 
-		if (algorithms == null || currentFile == null) return@withContext
+		if (algorithms == null || currentFile == null) return
 
 		for (hash in currentFile)
 		{
-			launch {
-				if (readResult.byteArray.isEmpty())
-				{
-					hash.calculateHexString()
-				} else
-				{
-					hash.messageDigest.update(readResult.byteArray)
-				}
+			if (readResult.byteArray.isEmpty())
+			{
+				hash.calculateHexString()
+			} else
+			{
+				hash.messageDigest.update(readResult.byteArray)
 			}
 		}
 	}
