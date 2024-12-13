@@ -1,13 +1,16 @@
 package com.plema.web
 
+import com.plema.web.controllers.HashController
 import io.ktor.server.application.*
-import io.ktor.server.response.respondText
 import io.ktor.server.routing.*
 
-fun Application.configureRouting() {
-    routing {
-        route("hash") {
+fun Application.configureRouting()
+{
+	val hashController = HashController()
 
-        }
-    }
+	routing {
+		route("hash") {
+			post("start") { hashController.startHashing(call) }
+		}
+	}
 }
