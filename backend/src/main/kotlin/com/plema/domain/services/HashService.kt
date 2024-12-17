@@ -1,57 +1,46 @@
 package com.plema.domain.services
 
+import com.plema.domain.Hash
 import com.plema.domain.HashProcess
-import com.plema.domain.dtos.file.ReadResult
-import com.plema.domain.dtos.hash.StartHashRequest
-import com.plema.domain.hashProcesses
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.consumeEach
 
-class HashService
-{
+class HashService {
+    private val fileService = FileService()
 
-	private val fileService = FileService()
+    suspend fun startHash(process: HashProcess) =
+        withContext(Dispatchers.IO) {
+            launch {
+                fileService.readFile(process)
+            }
 
-	suspend fun startHash(startHashData: StartHashRequest): UUID
-	{
-		val uuid = UUID.randomUUID()
-		withContext(Dispatchers.IO) {
-			val process = HashProcess(startHashData.algorithms)
-			val files = fileService.getAllFiles(startHashData.path)
+            calculateHashes(process.hashes, process.channel)
+            finalizeHashes(process.hashes)
 
-			process.initFiles(files)
-			hashProcesses[uuid] = process
+            process.finish()
+            process.hashes.forEach {
+                println(it.hexString)
+            }
+            process.notificationsChannel.close()
+        }
 
-			for (file in files)
-			{
-				launch {
-					fileService.readFile(file, uuid).collect { calculateHashes(it) }
-				}
-			}
-		}
+    private suspend fun calculateHashes(hashes: List<Hash>, receiveChannel: ReceiveChannel<ByteArray>) =
+        withContext(Dispatchers.Default) {
+            receiveChannel.consumeEach {
+                hashes.map { hash ->
+                    launch {
+                        hash.messageDigest.update(it)
+                    }
+                }.joinAll()
+            }
+        }
 
-		return uuid
-	}
-
-	private fun calculateHashes(readResult: ReadResult) {
-		val process = hashProcesses[readResult.processId]
-		val algorithms = process?.algorithms
-		val currentFile = process?.files[readResult.filePath]
-
-		if (algorithms == null || currentFile == null) return
-
-		for (hash in currentFile)
-		{
-			if (readResult.byteArray.isEmpty())
-			{
-				hash.calculateHexString()
-			} else
-			{
-				hash.messageDigest.update(readResult.byteArray)
-			}
-		}
-	}
-
+    private suspend fun finalizeHashes(hashes: List<Hash>) = withContext(Dispatchers.Default) {
+        hashes.map {
+            launch {
+                it.calculateHexString()
+            }
+        }.joinAll()
+    }
 }

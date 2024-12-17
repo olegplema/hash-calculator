@@ -1,8 +1,7 @@
 package com.plema.domain
 
-import com.plema.domain.dtos.hash.HashAlgorithms
 import io.ktor.util.collections.*
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import java.io.File
 import java.security.MessageDigest
 import java.util.*
@@ -10,55 +9,48 @@ import java.util.*
 
 val hashProcesses = ConcurrentMap<UUID, HashProcess>()
 
-class Hash(var messageDigest: MessageDigest)
-{
-	private var hexString: String? = null
+class Hash(algorithm: String) {
+    var messageDigest: MessageDigest
+        private set
 
-	fun getHexString() = hexString
+    init {
+        messageDigest = MessageDigest.getInstance(algorithm)
+    }
 
-	fun calculateHexString()
-	{
-		val res = messageDigest.digest()
-		hexString = res.joinToString("") { "%02x".format(it) }
-	}
+    var hexString: String? = null
+        private set
+
+    fun calculateHexString() {
+        val res = messageDigest.digest()
+        hexString = res.joinToString("") { "%02x".format(it) }
+    }
 }
 
-class HashProcess(private val _algorithms: Array<HashAlgorithms>)
-{
-	private val _files = ConcurrentMap<String, List<Hash>>()
+class HashProcess(private val _algorithms: Array<String>, val file: File) {
+    private val _hashes = ArrayList<Hash>()
+    val channel = Channel<ByteArray>()
+    val notificationsChannel = Channel<Int>(Channel.CONFLATED)
 
-	val files: Map<String, List<Hash>>
-		get() = _files
+    var isDone = false
+        private set
 
-	val algorithms: Array<HashAlgorithms>
-		get() = _algorithms
+    fun finish() {
+        isDone = true
+    }
 
-	private var _job: Job? = null
-		set(value)
-		{
-			if (field == null)
-			{
-				field = value
-			}
-		}
+    val hashes: List<Hash>
+        get() = _hashes
 
-	fun initFiles(dirFiles: List<File>)
-	{
-		dirFiles.forEach {
-			val hashes = ArrayList<Hash>()
-			algorithms.forEach {
-				val md = MessageDigest.getInstance(it.algorithmName)
-				hashes.add(Hash(md))
-			}
+    var isStopped = false
+        private set
 
-			_files[it.absolutePath] = hashes
-		}
-	}
+    fun stopProcess() {
+        isStopped = true
+    }
 
-	fun getJob() = _job
-
-	fun setJob(value: Job)
-	{
-		_job = value
-	}
+    fun initDigests() {
+        _algorithms.forEach {
+            _hashes.add(Hash(it))
+        }
+    }
 }
