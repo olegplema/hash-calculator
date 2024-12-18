@@ -1,16 +1,48 @@
 import {useEffect, useState} from "react";
 import {hashHttpService} from "../Services";
-import {IHashResult} from "../Types/calculation-responses.ts";
+import {IHashResult, IProgressResponse} from "../Types/calculation-responses.ts";
 
 export default () => {
     const [filePath, setFilePath] = useState<string>("/Users/oleg/Desktop/largefile.dat")
     const [algorithms, setAlgorithms] = useState<Array<string>>([])
     const [processId, setProcessId] = useState<string>("")
     const [hashes, setHashes] = useState<Array<IHashResult>>([])
+    const [isLoading, setIsLoading] = useState(false)
+    const [progress, setProgress] = useState<IProgressResponse>({
+        isStopped: false,
+        bytesRead: 0,
+        totalBytes: 1
+    })
+
+    const reset = () => {
+        setProcessId("")
+        setHashes([])
+        setProgress({
+            isStopped: false,
+            bytesRead: 0,
+            totalBytes: 1
+        })
+    }
+
+    const stop = () => {
+        hashHttpService.stopProcess(processId)
+    }
 
     const getResult = async () => {
+        setIsLoading(true)
         const response = await hashHttpService.getResult(processId)
         setHashes(response)
+        setIsLoading(false)
+    }
+
+    const getProgress = async () => {
+        const response = await hashHttpService.getProgress(processId)
+
+        if (response.isStopped) {
+            setIsLoading(false)
+        }
+
+        setProgress(response)
     }
 
     useEffect(() => {
@@ -18,14 +50,17 @@ export default () => {
             getResult()
     }, [processId])
 
+    useEffect(() => {
+        if (processId && !progress.isStopped && progress.bytesRead !== progress.totalBytes)
+            getProgress()
+    }, [processId, progress]);
+
     const start = async () => {
+        reset()
         if (!filePath || !algorithms.length) return
 
         const response = await hashHttpService.startCalculation(filePath, algorithms)
         setProcessId(response.processId)
-        setFilePath("")
-        setAlgorithms([])
-        console.log(response)
     }
 
     const handleCheckboxChange = (label, isChecked) => {
@@ -44,6 +79,9 @@ export default () => {
         filePath,
         algorithms,
         handleCheckboxChange,
-        hashes
+        hashes,
+        isLoading,
+        progress,
+        stop
     }
 }

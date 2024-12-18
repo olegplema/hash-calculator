@@ -1,2 +1,2 @@
-import useCalculation from "./start-calculation.ts";
+import useCalculation from "./calculation.ts";
 export {useCalculation}

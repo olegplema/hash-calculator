@@ -29,7 +29,7 @@ class Hash(algorithm: String) {
 class HashProcess(private val _algorithms: Array<String>, val file: File) {
     private val _hashes = ArrayList<Hash>()
     val channel = Channel<ByteArray>()
-    val notificationsChannel = Channel<Int>(Channel.CONFLATED)
+    val notificationsChannel = Channel<Long>(Channel.CONFLATED)
 
     var isDone = false
         private set

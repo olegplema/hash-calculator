@@ -23,10 +23,6 @@ class HashController {
     suspend fun startHashing(call: RoutingCall) {
 		val startHashData = call.receive<StartHashRequest>()
 
-//        val hashAlgorithms = arrayOf("MD5", "SHA-1", "SHA-256")
-//        val path = "/Users/oleg/Desktop/largefile.dat"
-//        val startHash = StartHashRequest(path, hashAlgorithms)
-
         val file = File(startHashData.path)
         val process = HashProcess(startHashData.algorithms, file)
 
@@ -42,42 +38,25 @@ class HashController {
     }
 
     suspend fun getProgress(call: RoutingCall) {
-        val getProgressData = call.receive<GetProgressRequest>()
-        val process = hashProcesses[UUID.fromString(getProgressData.processId)] ?: return call.respond(HttpStatusCode.NotFound)
+        val processId = call.request.queryParameters["processId"]
+        val process = hashProcesses[UUID.fromString(processId)] ?: return call.respond(HttpStatusCode.NotFound)
 
-        val bytesAvailable = process.notificationsChannel.receive()
+        val progress = hashService.getProgress(process)
 
-        val bytesRead = process.file.length() - bytesAvailable
-        call.respond(GetProgressResponse(bytesRead, process.file.length(), process.isStopped))
+        call.respond(progress)
     }
 
     suspend fun getResult(call: RoutingCall) {
         val processId = call.request.queryParameters["processId"]
         val process = hashProcesses[UUID.fromString(processId)] ?: return call.respond(HttpStatusCode.NotFound)
 
-        if (process.isDone) {
-            val result = process.hashes.map {
-                HashResult(it.messageDigest.algorithm, it.hexString ?:   "foo")
-            }
-            call.respond(result)
-            return
-        }
+        val result = hashService.waitResult(process)
 
-        callbackFlow {
-            process.notificationsChannel.invokeOnClose {
-                trySend(process.hashes.map {
-                    HashResult(it.messageDigest.algorithm, it.hexString ?: "foo1")
-                })
-                close()
-            }
-            awaitClose()
-        }.collect { hashResults ->
-            call.respond(hashResults)
-        }
+        call.respond(result)
     }
 
     suspend fun stopProcess(call: RoutingCall) {
-        val getProgressData = call.receive<GetProgressRequest>()
+        val getProgressData = call.receive<StopProgressRequest>()
         val process = hashProcesses[UUID.fromString(getProgressData.processId)] ?: return call.respond(HttpStatusCode.NotFound)
         process.stopProcess()
         call.respond(HttpStatusCode.OK)

@@ -11,9 +11,17 @@ class FileService {
             var bytesRead: Int
             val buffer = ByteArray(2097152)
             val fileInputStream = FileInputStream(process.file)
+            var totalBytesRead: Long = 0
+            val onePercentSize = process.file.length() / 100 * 5
+            var nextNotificationThreshold = onePercentSize
+
             try {
                 while (fileInputStream.read(buffer).also { bytesRead = it } > 0 && !process.isStopped) {
-                    process.notificationsChannel.send(fileInputStream.available())
+                    totalBytesRead += bytesRead
+                    if (totalBytesRead >= nextNotificationThreshold) {
+                        process.notificationsChannel.send(totalBytesRead)
+                        nextNotificationThreshold += onePercentSize
+                    }
                     process.channel.send(buffer.copyOf(bytesRead))
                 }
             } catch (e: Error) {

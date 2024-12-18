@@ -13,9 +13,9 @@ fun main(args: Array<String>) {
 
 fun Application.module() {
     install(CORS) {
-        anyHost() // дозволити будь-який домен
+        anyHost()
         anyMethod()
-        allowCredentials = true // дозволити кукі
+        allowCredentials = true
         allowNonSimpleContentTypes = true
         allowHeader(HttpHeaders.ContentType)
     }
