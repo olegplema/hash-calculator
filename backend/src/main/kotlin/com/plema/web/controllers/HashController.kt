@@ -13,36 +13,52 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 class HashController {
     private val hashService = HashService()
     private val hashScope = CoroutineScope(Dispatchers.IO)
+    private val mapLock = Mutex()
+    private val hashProcesses = ConcurrentHashMap<UUID, HashProcess>()
 
     suspend fun startHashing(call: RoutingCall) {
-		val startHashData = call.receive<StartHashRequest>()
-
+        val startHashData = call.receive<StartHashRequest>()
         val file = File(startHashData.path)
+        if (!file.exists()) {
+            return call.respond(HttpStatusCode.BadRequest, "File not found")
+        }
         val process = HashProcess(startHashData.algorithms, file)
-
         val uuid = UUID.randomUUID()
         process.initDigests()
-        hashProcesses[uuid] = process
-
+    
+        mapLock.withLock {
+            hashProcesses[uuid] = process
+        }
+    
         hashScope.launch {
             hashService.startHash(process)
         }
-
+    
         call.respond(StartHashResponse(uuid.toString()))
     }
-
+    
     suspend fun getProgress(call: RoutingCall) {
-        val processId = call.request.queryParameters["processId"]
-        val process = hashProcesses[UUID.fromString(processId)] ?: return call.respond(HttpStatusCode.NotFound)
-
+        val processIdParam = call.request.queryParameters["processId"]
+            ?: return call.respond(HttpStatusCode.BadRequest, "Missing processId")
+    
+        val processId = runCatching { UUID.fromString(processIdParam) }.getOrElse {
+            return call.respond(HttpStatusCode.BadRequest, "Invalid processId")
+        }
+    
+        val process = mapLock.withLock {
+            hashProcesses[processId]
+        } ?: return call.respond(HttpStatusCode.NotFound)
+    
         val progress = hashService.getProgress(process)
-
         call.respond(progress)
     }
 
