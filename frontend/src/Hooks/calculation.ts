@@ -63,7 +63,7 @@ export default () => {
         setProcessId(response.processId)
     }
 
-    const handleCheckboxChange = (label, isChecked) => {
+    const handleCheckboxChange = (label: string, isChecked: boolean) => {
         if (isChecked) {
             setAlgorithms((prevValues) => [...prevValues, label]);
         } else {
