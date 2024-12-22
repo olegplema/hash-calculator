@@ -1,7 +1,9 @@
 package com.plema.web.controllers
 
 import com.plema.domain.HashProcess
-import com.plema.domain.dtos.hash.*
+import com.plema.domain.dtos.hash.StartHashRequest
+import com.plema.domain.dtos.hash.StartHashResponse
+import com.plema.domain.dtos.hash.StopProgressRequest
 import com.plema.domain.services.HashService
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -13,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.*
-import io.ktor.util.collections.*
 
 class HashController {
     private val hashService = HashService()

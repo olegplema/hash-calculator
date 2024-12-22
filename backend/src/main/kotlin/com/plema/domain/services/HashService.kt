@@ -15,19 +15,17 @@ class HashService {
     private val fileService = FileService()
 
     suspend fun startHash(process: HashProcess) = withContext(Dispatchers.IO) {
-        coroutineScope {
-            val readJob = launch {
-                fileService.readFile(process)
-            }
-
-            calculateHashes(process.hashes, process.channel)
-            finalizeHashes(process.hashes)
-
-            readJob.join()
-
-            process.finish()
-            process.notificationsChannel.close()
+        val readJob = launch {
+            fileService.readFile(process)
         }
+
+        calculateHashes(process.hashes, process.channel)
+        finalizeHashes(process.hashes)
+
+        readJob.join()
+
+        process.finish()
+        process.notificationsChannel.close()
     }
 
     private suspend fun calculateHashes(hashes: List<Hash>, receiveChannel: ReceiveChannel<ByteArray>) =
