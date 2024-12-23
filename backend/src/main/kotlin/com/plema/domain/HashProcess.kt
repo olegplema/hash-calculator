@@ -1,13 +1,9 @@
 package com.plema.domain
 
-import io.ktor.util.collections.*
 import kotlinx.coroutines.channels.Channel
 import java.io.File
 import java.security.MessageDigest
 import java.util.*
-
-
-val hashProcesses = ConcurrentMap<UUID, HashProcess>()
 
 class Hash(algorithm: String) {
     var messageDigest: MessageDigest

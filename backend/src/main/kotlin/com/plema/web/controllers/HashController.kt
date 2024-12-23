@@ -1,17 +1,17 @@
 package com.plema.web.controllers
 
 import com.plema.domain.HashProcess
-import com.plema.domain.dtos.hash.*
-import com.plema.domain.hashProcesses
+import com.plema.domain.dtos.hash.StartHashRequest
+import com.plema.domain.dtos.hash.StartHashResponse
+import com.plema.domain.dtos.hash.StopProgressRequest
 import com.plema.domain.services.HashService
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.collections.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.*
@@ -19,6 +19,8 @@ import java.util.*
 class HashController {
     private val hashService = HashService()
     private val hashScope = CoroutineScope(Dispatchers.IO)
+
+    val hashProcesses = ConcurrentMap<UUID, HashProcess>()
 
     suspend fun startHashing(call: RoutingCall) {
 		val startHashData = call.receive<StartHashRequest>()

@@ -14,18 +14,19 @@ import kotlinx.coroutines.flow.callbackFlow
 class HashService {
     private val fileService = FileService()
 
-    suspend fun startHash(process: HashProcess) =
-        withContext(Dispatchers.IO) {
-            launch {
-                fileService.readFile(process)
-            }
-
-            calculateHashes(process.hashes, process.channel)
-            finalizeHashes(process.hashes)
-
-            process.finish()
-            process.notificationsChannel.close()
+    suspend fun startHash(process: HashProcess) = withContext(Dispatchers.IO) {
+        val readJob = launch {
+            fileService.readFile(process)
         }
+
+        calculateHashes(process.hashes, process.channel)
+        finalizeHashes(process.hashes)
+
+        readJob.join()
+
+        process.finish()
+        process.notificationsChannel.close()
+    }
 
     private suspend fun calculateHashes(hashes: List<Hash>, receiveChannel: ReceiveChannel<ByteArray>) =
         withContext(Dispatchers.Default) {
