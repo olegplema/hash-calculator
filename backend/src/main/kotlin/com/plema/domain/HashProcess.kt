@@ -1,13 +1,9 @@
 package com.plema.domain
 
-import io.ktor.util.collections.*
 import kotlinx.coroutines.channels.Channel
 import java.io.File
 import java.security.MessageDigest
-import java.util.*
-
-
-val hashProcesses = ConcurrentMap<UUID, HashProcess>()
+import java.util.concurrent.ConcurrentHashMap
 
 class Hash(algorithm: String) {
     var messageDigest: MessageDigest
@@ -26,8 +22,12 @@ class Hash(algorithm: String) {
     }
 }
 
-class HashProcess(private val _algorithms: Array<String>, val file: File) {
-    private val _hashes = ArrayList<Hash>()
+class ProcessedFile(val hashes: List<Hash>) {
+    val channel = Channel<ByteArray>()
+}
+
+class HashProcess(private val _algorithms: Array<String>, val dir: File) {
+    private val _filesHashes = ConcurrentHashMap<File, ProcessedFile>()
     val channel = Channel<ByteArray>()
     val notificationsChannel = Channel<Long>(Channel.CONFLATED)
 
@@ -38,8 +38,8 @@ class HashProcess(private val _algorithms: Array<String>, val file: File) {
         isDone = true
     }
 
-    val hashes: List<Hash>
-        get() = _hashes
+    val filesHashes: Map<File, ProcessedFile>
+        get() = _filesHashes
 
     var isStopped = false
         private set
@@ -48,9 +48,23 @@ class HashProcess(private val _algorithms: Array<String>, val file: File) {
         isStopped = true
     }
 
+
+    private fun getAllFiles(directory: File): List<File> {
+        return if (directory.exists() && directory.isDirectory) {
+            directory.walk().filter { it.isFile }.toList()
+        } else {
+            emptyList()
+        }
+    }
+
     fun initDigests() {
-        _algorithms.forEach {
-            _hashes.add(Hash(it))
+        val files = getAllFiles(dir)
+
+        files.forEach { file ->
+            val hashes = _algorithms.map {
+                Hash(it)
+            }
+            _filesHashes[file] = ProcessedFile(hashes)
         }
     }
 }
