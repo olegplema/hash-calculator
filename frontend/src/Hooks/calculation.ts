@@ -1,12 +1,12 @@
 import {useEffect, useState} from "react";
 import {hashHttpService} from "../Services";
-import {IHashResult, IProgressResponse} from "../Types/calculation-responses.ts";
+import {IProgressResponse, IResultResponse} from "../Types/calculation-responses.ts";
 
 export default () => {
-    const [filePath, setFilePath] = useState<string>("/Users/oleg/Desktop/largefile.dat")
+    const [filePath, setFilePath] = useState<string>("/home/atola/Desktop")
     const [algorithms, setAlgorithms] = useState<Array<string>>([])
     const [processId, setProcessId] = useState<string>("")
-    const [hashes, setHashes] = useState<Array<IHashResult>>([])
+    const [hashes, setHashes] = useState<IResultResponse>({hashes: {}})
     const [isLoading, setIsLoading] = useState(false)
     const [progress, setProgress] = useState<IProgressResponse>({
         isStopped: false,
@@ -16,7 +16,7 @@ export default () => {
 
     const reset = () => {
         setProcessId("")
-        setHashes([])
+        setHashes({hashes: {}})
         setProgress({
             isStopped: false,
             bytesRead: 0,
@@ -63,7 +63,7 @@ export default () => {
         setProcessId(response.processId)
     }
 
-    const handleCheckboxChange = (label, isChecked) => {
+    const handleCheckboxChange = (label: string, isChecked: boolean) => {
         if (isChecked) {
             setAlgorithms((prevValues) => [...prevValues, label]);
         } else {
