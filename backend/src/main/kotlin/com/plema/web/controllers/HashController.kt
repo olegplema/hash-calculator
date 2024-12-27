@@ -50,12 +50,7 @@ class HashController {
         val processId = call.request.queryParameters["processId"]
         val process = hashProcesses[UUID.fromString(processId)] ?: return call.respond(HttpStatusCode.NotFound)
 
-        var result: Any
-        val time = measureTimeMillis {
-            result = hashService.waitResult(process)
-        }
-
-        println("total time is: $time")
+        val result = hashService.waitResult(process)
 
         call.respond(result)
     }
