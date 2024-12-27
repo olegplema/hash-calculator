@@ -26,7 +26,9 @@ class HashService
 			}
 				.joinAll()
 
+
 			process.notificationsChannel.close()
+
 		}
 	}
 
@@ -44,16 +46,27 @@ class HashService
 			calculateHashes(hashes, channel)
 			finalizeHashes(hashes)
 
-			notificationChannel.send(file.length())
+			try
+			{
+				notificationChannel.send(file.length())
+			} catch (_: ClosedSendChannelException)
+			{
+				println("Process has been closed")
+			}
 		}
 
-	private suspend fun calculateHashes(hashes: List<Hash>, receiveChannel: ReceiveChannel<ByteArray>) =
+	private suspend fun calculateHashes(
+		hashes: List<Hash>,
+		receiveChannel: ReceiveChannel<ByteArray>
+	                                   ) =
 		withContext(Dispatchers.Default) {
 			receiveChannel.consumeEach {
 				hashes.map { hash ->
+
 					launch {
 						hash.messageDigest.update(it)
 					}
+
 				}
 					.joinAll()
 			}
@@ -71,7 +84,7 @@ class HashService
 	suspend fun waitResult(process: HashProcess): ProcessResult
 	{
 		val result = ProcessResult()
-		if (process.notificationsChannel.isClosedForSend)
+		if (process.isDone)
 		{
 			result.convertToResult(process.filesHashes)
 			return result
@@ -81,18 +94,17 @@ class HashService
 			process.notificationsChannel.invokeOnClose {
 				if (process.isStopped)
 				{
-					trySend(ArrayList(0))
+					trySend(HashMap())
 				} else
 				{
-					trySend(process.filesHashes.map {
-
-					})
+					trySend(process.filesHashes)
 				}
+				process.finish()
 				close()
 			}
 			awaitClose()
 		}.collect { hashResults ->
-			result.convertToResult(process.filesHashes)
+			result.convertToResult(hashResults)
 		}
 
 		return result
@@ -100,7 +112,7 @@ class HashService
 
 	suspend fun getProgress(process: HashProcess): GetProgressResponse
 	{
-		if (process.notificationsChannel.isClosedForSend || process.isStopped)
+		if (process.isDone || process.isStopped)
 		{
 			return GetProgressResponse(process.totalBytes, process.totalBytes, true)
 		}

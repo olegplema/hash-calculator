@@ -41,12 +41,21 @@ class HashProcess(private val _algorithms: Array<String>, val dir: File)
 	var isStopped = false
 		private set
 
-	fun stopProcess()
-	{
+	var isDone = false
+		private set
+
+	fun finish() {
 		isStopped = true
 	}
 
-	fun addReadBytes(bytes: Long) {
+	fun stopProcess()
+	{
+		isStopped = true
+		notificationsChannel.close()
+	}
+
+	fun addReadBytes(bytes: Long)
+	{
 		bytesRead += bytes
 	}
 

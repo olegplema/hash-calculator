@@ -13,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.*
-import kotlin.system.measureTimeMillis
 
 class HashController {
     private val hashService = HashService()
