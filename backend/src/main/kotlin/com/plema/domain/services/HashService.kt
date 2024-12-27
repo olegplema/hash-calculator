@@ -19,14 +19,13 @@ class HashService
 	suspend fun startHash(process: HashProcess)
 	{
 		withContext(Dispatchers.IO) {
-			val jobs = process.filesHashes.map { (key, value) ->
+			process.filesHashes.map { (key, value) ->
 				launch {
 					calculateFileHashes(key, value, process.isStopped, process.notificationsChannel)
 				}
 			}
+				.joinAll()
 
-			jobs.joinAll()
-			process.finish()
 			process.notificationsChannel.close()
 		}
 	}
@@ -55,7 +54,8 @@ class HashService
 					launch {
 						hash.messageDigest.update(it)
 					}
-				}.joinAll()
+				}
+					.joinAll()
 			}
 		}
 
@@ -64,13 +64,14 @@ class HashService
 			launch {
 				it.calculateHexString()
 			}
-		}.joinAll()
+		}
+			.joinAll()
 	}
 
 	suspend fun waitResult(process: HashProcess): ProcessResult
 	{
 		val result = ProcessResult()
-		if (process.isDone)
+		if (process.notificationsChannel.isClosedForSend)
 		{
 			result.convertToResult(process.filesHashes)
 			return result
@@ -99,22 +100,21 @@ class HashService
 
 	suspend fun getProgress(process: HashProcess): GetProgressResponse
 	{
-		println(process.notificationsChannel.isClosedForSend.toString() + " " + process.isStopped.toString())
 		if (process.notificationsChannel.isClosedForSend || process.isStopped)
 		{
-			return GetProgressResponse(process.dir.length(), process.dir.length(), true)
+			return GetProgressResponse(process.totalBytes, process.totalBytes, true)
 		}
 
 		val bytesRead = try
 		{
 			val fileSize = process.notificationsChannel.receive()
 			process.addReadBytes(fileSize)
-			process.totalBytesRead
+			process.bytesRead
 		} catch (_: ClosedReceiveChannelException)
 		{
-			process.dir.length()
+			process.totalBytes
 		}
 
-		return GetProgressResponse(bytesRead, process.dir.length(), process.isStopped)
+		return GetProgressResponse(bytesRead, process.totalBytes, process.isStopped)
 	}
 }

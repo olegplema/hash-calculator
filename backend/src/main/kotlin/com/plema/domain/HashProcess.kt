@@ -30,16 +30,10 @@ class HashProcess(private val _algorithms: Array<String>, val dir: File)
 {
 	private val _filesHashes = ConcurrentHashMap<File, List<Hash>>()
 	val notificationsChannel = Channel<Long>(100)
-	var totalBytesRead = 0L
+	var bytesRead = 0L
 		private set
-
-	var isDone = false
+	var totalBytes = 0L
 		private set
-
-	fun finish()
-	{
-		isDone = true
-	}
 
 	val filesHashes: Map<File, List<Hash>>
 		get() = _filesHashes
@@ -52,15 +46,15 @@ class HashProcess(private val _algorithms: Array<String>, val dir: File)
 		isStopped = true
 	}
 
-	fun addReadBytes(bytesRead: Long) {
-		totalBytesRead += bytesRead
+	fun addReadBytes(bytes: Long) {
+		bytesRead += bytes
 	}
 
 	private fun getAllFiles(directory: File): List<File>
 	{
 		return if (directory.exists() && directory.isDirectory)
 		{
-			directory.walk().filter { it.isFile }.toList()
+			directory.walk().filter { it.isFile }.onEach { totalBytes += it.length() }.toList()
 		} else
 		{
 			emptyList()
