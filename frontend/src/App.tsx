@@ -48,10 +48,18 @@ function App() {
             }
             <div className="flex items-center flex-col">
                 <div>
-                    {controller.hashes.map(hash => <div key={hash.algorithm + hash.hash} className={"flex flex-row"}>
-                        <div>{hash.algorithm + ":"}</div>
-                        <div>{hash.hash}</div>
-                    </div>)}
+                    {Object.keys(controller.hashes.hashes).map((fileName) => (
+                        <div key={fileName}>
+                            <h3 className="font-bold">{fileName}</h3>
+                            <ul>
+                                {controller.hashes.hashes[fileName].map((hash, index) => (
+                                    <li key={index}>
+                                        <p className="ml-3">{`${hash.algorithm}: ${hash.hash}`}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

@@ -1,5 +1,9 @@
 import axios from "axios";
-import {IHashResult, IProgressResponse, IStartCalculationResponse} from "../Types/calculation-responses.ts";
+import {
+    IProgressResponse,
+    IResultResponse,
+    IStartCalculationResponse
+} from "../Types/calculation-responses.ts";
 
 class HashHttpService {
     private readonly baseUrl = 'http://0.0.0.0:8080/hash/'
@@ -12,7 +16,7 @@ class HashHttpService {
         return response.data
     }
 
-    async getResult(processId: string): Promise<Array<IHashResult>> {
+    async getResult(processId: string): Promise<IResultResponse> {
         const response = await axios.get(this.baseUrl + "result", {
             params: {
                 processId

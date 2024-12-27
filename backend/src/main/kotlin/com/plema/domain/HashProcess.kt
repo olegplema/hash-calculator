@@ -1,56 +1,83 @@
 package com.plema.domain
 
-import io.ktor.util.collections.*
 import kotlinx.coroutines.channels.Channel
 import java.io.File
 import java.security.MessageDigest
-import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 
-val hashProcesses = ConcurrentMap<UUID, HashProcess>()
+class Hash(algorithm: String)
+{
+	var messageDigest: MessageDigest
+		private set
 
-class Hash(algorithm: String) {
-    var messageDigest: MessageDigest
-        private set
+	init
+	{
+		messageDigest = MessageDigest.getInstance(algorithm)
+	}
 
-    init {
-        messageDigest = MessageDigest.getInstance(algorithm)
-    }
+	var hexString: String? = null
+		private set
 
-    var hexString: String? = null
-        private set
-
-    fun calculateHexString() {
-        val res = messageDigest.digest()
-        hexString = res.joinToString("") { "%02x".format(it) }
-    }
+	fun calculateHexString()
+	{
+		val res = messageDigest.digest()
+		hexString = res.joinToString("") { "%02x".format(it) }
+	}
 }
 
-class HashProcess(private val _algorithms: Array<String>, val file: File) {
-    private val _hashes = ArrayList<Hash>()
-    val channel = Channel<ByteArray>()
-    val notificationsChannel = Channel<Long>(Channel.CONFLATED)
+class HashProcess(private val _algorithms: Array<String>, val dir: File)
+{
+	private val _filesHashes = ConcurrentHashMap<File, List<Hash>>()
+	val notificationsChannel = Channel<Long>(100)
+	var bytesRead = 0L
+		private set
+	var totalBytes = 0L
+		private set
 
-    var isDone = false
-        private set
+	val filesHashes: Map<File, List<Hash>>
+		get() = _filesHashes
 
-    fun finish() {
-        isDone = true
-    }
+	var isStopped = false
+		private set
 
-    val hashes: List<Hash>
-        get() = _hashes
+	var isDone = false
+		private set
 
-    var isStopped = false
-        private set
+	fun finish() {
+		isStopped = true
+	}
 
-    fun stopProcess() {
-        isStopped = true
-    }
+	fun stopProcess()
+	{
+		isStopped = true
+		notificationsChannel.close()
+	}
 
-    fun initDigests() {
-        _algorithms.forEach {
-            _hashes.add(Hash(it))
-        }
-    }
+	fun addReadBytes(bytes: Long)
+	{
+		bytesRead += bytes
+	}
+
+	private fun getAllFiles(directory: File): List<File>
+	{
+		return if (directory.exists() && directory.isDirectory)
+		{
+			directory.walk().filter { it.isFile }.onEach { totalBytes += it.length() }.toList()
+		} else
+		{
+			emptyList()
+		}
+	}
+
+	fun initDigests()
+	{
+		val files = getAllFiles(dir)
+
+		files.forEach { file ->
+			_filesHashes[file] = _algorithms.map {
+				Hash(it)
+			}
+		}
+	}
 }

@@ -3,88 +3,130 @@ package com.plema.domain.services
 import com.plema.domain.Hash
 import com.plema.domain.HashProcess
 import com.plema.domain.dtos.hash.GetProgressResponse
-import com.plema.domain.dtos.hash.HashResult
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
-import kotlinx.coroutines.channels.ReceiveChannel
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.consumeEach
+import com.plema.domain.dtos.hash.ProcessResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
-class HashService {
-    private val fileService = FileService()
+class HashService
+{
+	private val fileService = FileService()
 
-    suspend fun startHash(process: HashProcess) =
-        withContext(Dispatchers.IO) {
-            launch {
-                fileService.readFile(process)
-            }
+	suspend fun startHash(process: HashProcess)
+	{
+		withContext(Dispatchers.IO) {
+			process.filesHashes.map { (key, value) ->
+				launch {
+					calculateFileHashes(key, value, process.isStopped, process.notificationsChannel)
+				}
+			}
+				.joinAll()
 
-            calculateHashes(process.hashes, process.channel)
-            finalizeHashes(process.hashes)
 
-            process.finish()
-            process.notificationsChannel.close()
-        }
+			process.notificationsChannel.close()
 
-    private suspend fun calculateHashes(hashes: List<Hash>, receiveChannel: ReceiveChannel<ByteArray>) =
-        withContext(Dispatchers.Default) {
-            receiveChannel.consumeEach {
-                hashes.map { hash ->
-                    launch {
-                        hash.messageDigest.update(it)
-                    }
-                }.joinAll()
-            }
-        }
+		}
+	}
 
-    private suspend fun finalizeHashes(hashes: List<Hash>) = withContext(Dispatchers.Default) {
-        hashes.map {
-            launch {
-                it.calculateHexString()
-            }
-        }.joinAll()
-    }
+	private suspend fun calculateFileHashes(
+		file: File,
+		hashes: List<Hash>,
+		isStopped: Boolean,
+		notificationChannel: SendChannel<Long>
+	                                       ) =
+		withContext(Dispatchers.IO) {
+			val channel = Channel<ByteArray>()
+			launch {
+				fileService.readFile(file, channel, isStopped)
+			}
+			calculateHashes(hashes, channel)
+			finalizeHashes(hashes)
 
-    suspend fun waitResult(process: HashProcess): List<HashResult> {
-        if (process.isDone) {
-            return process.hashes.map {
-                HashResult(it.messageDigest.algorithm, it.hexString)
-            }
-        }
+			try
+			{
+				notificationChannel.send(file.length())
+			} catch (_: ClosedSendChannelException)
+			{
+				println("Process has been closed")
+			}
+		}
 
-        var result: List<HashResult>? = null
-        callbackFlow {
-            process.notificationsChannel.invokeOnClose {
-                if (process.isStopped) {
-                    trySend(ArrayList(0))
-                } else {
-                    trySend(process.hashes.map {
-                        HashResult(it.messageDigest.algorithm, it.hexString)
-                    })
-                }
-                close()
-            }
-            awaitClose()
-        }.collect { hashResults ->
-            result = hashResults
-        }
+	private suspend fun calculateHashes(
+		hashes: List<Hash>,
+		receiveChannel: ReceiveChannel<ByteArray>
+	                                   ) =
+		withContext(Dispatchers.Default) {
+			receiveChannel.consumeEach {
+				hashes.map { hash ->
 
-        return result!!
-    }
+					launch {
+						hash.messageDigest.update(it)
+					}
 
-    suspend fun getProgress(process: HashProcess): GetProgressResponse {
-        println(process.notificationsChannel.isClosedForSend.toString() + " " + process.isStopped.toString())
-        if (process.notificationsChannel.isClosedForSend || process.isStopped) {
-            return GetProgressResponse(process.file.length(), process.file.length(), true)
-        }
+				}
+					.joinAll()
+			}
+		}
 
-        val bytesRead = try {
-            process.notificationsChannel.receive()
-        } catch (e: ClosedReceiveChannelException) {
-            process.file.length()
-        }
+	private suspend fun finalizeHashes(hashes: List<Hash>) = withContext(Dispatchers.Default) {
+		hashes.map {
+			launch {
+				it.calculateHexString()
+			}
+		}
+			.joinAll()
+	}
 
-        return GetProgressResponse(bytesRead, process.file.length(), process.isStopped)
-    }
+	suspend fun waitResult(process: HashProcess): ProcessResult
+	{
+		val result = ProcessResult()
+		if (process.isDone)
+		{
+			result.convertToResult(process.filesHashes)
+			return result
+		}
+
+		callbackFlow {
+			process.notificationsChannel.invokeOnClose {
+				if (process.isStopped)
+				{
+					trySend(HashMap())
+				} else
+				{
+					trySend(process.filesHashes)
+				}
+				process.finish()
+				close()
+			}
+			awaitClose()
+		}.collect { hashResults ->
+			result.convertToResult(hashResults)
+		}
+
+		return result
+	}
+
+	suspend fun getProgress(process: HashProcess): GetProgressResponse
+	{
+		if (process.isDone || process.isStopped)
+		{
+			return GetProgressResponse(process.totalBytes, process.totalBytes, true)
+		}
+
+		val bytesRead = try
+		{
+			val fileSize = process.notificationsChannel.receive()
+			process.addReadBytes(fileSize)
+			process.bytesRead
+		} catch (_: ClosedReceiveChannelException)
+		{
+			process.totalBytes
+		}
+
+		return GetProgressResponse(bytesRead, process.totalBytes, process.isStopped)
+	}
 }

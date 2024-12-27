@@ -8,6 +8,14 @@ export interface IHashResult {
    hash: string
 }
 
+export interface IFilesHashes {
+   [key: string]:Array<IHashResult>
+}
+
+export interface IResultResponse {
+   hashes: IFilesHashes
+}
+
 export interface IProgressResponse {
    bytesRead: number
    totalBytes: number
