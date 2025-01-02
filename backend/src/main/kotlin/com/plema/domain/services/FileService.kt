@@ -17,7 +17,7 @@ class FileService {
                 while (fileInputStream.read(buffer).also { bytesRead = it } > 0 && !isStopped) {
                     channel.send(buffer.copyOf(bytesRead))
                 }
-            } catch (e: Error) {
+            } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 fileInputStream.close()

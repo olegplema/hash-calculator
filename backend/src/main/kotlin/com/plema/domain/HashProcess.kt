@@ -63,7 +63,7 @@ class HashProcess(private val _algorithms: Array<String>, val dir: File)
 	{
 		return if (directory.exists() && directory.isDirectory)
 		{
-			directory.walk().filter { it.isFile }.onEach { totalBytes += it.length() }.toList()
+			directory.walk().filter { it.isFile && it.canRead()}.onEach { totalBytes += it.length() }.toList()
 		} else
 		{
 			emptyList()
